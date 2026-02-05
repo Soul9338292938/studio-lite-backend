@@ -1,68 +1,63 @@
-const express = require("express");
+const express = require("express")
+const fs = require("fs")
+const axios = require("axios")
+const app = express()
 
-const app = express();
-app.use(express.json());
+app.use(express.json())
 
-const PORT = process.env.PORT || 3000;
+const API_KEY = process.env.ROBLOX_API_KEY
+const TEMPLATE_PATH = "./TEMPLATE.rbxl"
 
-app.get("/", (_req, res) => {
-  res.send("Studio-Lite backend running");
-});
 
+
+
+
+// ================= LOAD USER GAMES =================
 app.get("/games", async (req, res) => {
-  try {
-    const { key, userId } = req.query || {};
+    const userId = req.query.userId
+    if (!userId) return res.json({ success:false, error:"Missing userId" })
 
-    if (!key || !userId) {
-      return res.status(400).json({ success: false });
+    try {
+        const r = await axios.get(
+            `https://games.roblox.com/v2/users/${userId}/games`
+        )
+
+        res.json({ success:true, games:r.data.data })
+    } catch (e) {
+        res.json({ success:false, error:"Failed to fetch games" })
     }
+})
 
-    const r = await fetch(
-      `https://apis.roblox.com/universes/v1/users/${userId}/universes`,
-      {
-        headers: { "x-api-key": key }
-      }
-    );
 
-    if (!r.ok) {
-      return res.status(400).json({ success: false });
-    }
 
-    const data = await r.json();
-    return res.json({ success: true, games: data.data || [] });
-  } catch {
-    return res.status(500).json({ success: false });
-  }
-});
 
+// ================= REAL PLACE PUBLISH =================
 app.post("/publish", async (req, res) => {
-  try {
-    const { key, placeId } = req.body || {};
+    const placeId = req.body.placeId
+    if (!placeId) return res.json({ success:false, error:"Missing placeId" })
 
-    if (!key || !placeId) {
-      return res.status(400).json({ success: false });
+    try {
+
+        const fileBuffer = fs.readFileSync(TEMPLATE_PATH)
+
+        const upload = await axios.post(
+            `https://apis.roblox.com/universes/v1/places/${placeId}/versions`,
+            fileBuffer,
+            {
+                headers: {
+                    "x-api-key": API_KEY,
+                    "Content-Type": "application/octet-stream"
+                }
+            }
+        )
+
+        res.json({ success:true, version:upload.data.versionNumber })
+
+    } catch (e) {
+        res.json({ success:false, error:"Publish failed" })
     }
+})
 
-    const r = await fetch(
-      `https://apis.roblox.com/universes/v1/places/${Number(placeId)}/versions`,
-      {
-        method: "POST",
-        headers: {
-          "x-api-key": key,
-          "Content-Type": "application/json"
-        },
-        body: "{}"
-      }
-    );
 
-    if (!r.ok) {
-      return res.status(400).json({ success: false });
-    }
 
-    return res.json({ success: true });
-  } catch {
-    return res.status(500).json({ success: false });
-  }
-});
-
-app.listen(PORT);
+app.listen(3000, () => console.log("Server running"))
