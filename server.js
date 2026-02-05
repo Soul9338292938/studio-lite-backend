@@ -4,80 +4,71 @@ const fetch = require("node-fetch");
 const app = express();
 app.use(express.json());
 
-/* ================================
-   HEALTH CHECK
-================================ */
 app.get("/", (req, res) => {
-  res.send("Studio Lite backend running");
+    res.send("Studio Lite backend running");
 });
 
-/* ================================
+/* ===============================
    GET PLAYER GAMES
 ================================ */
 app.get("/games", async (req, res) => {
-  const { apiKey, userId } = req.query;
+    const { userId } = req.query;
 
-  if (!apiKey || !userId) {
-    return res.status(400).json({ success: false, error: "Missing apiKey or userId" });
-  }
+    if (!userId) {
+        return res.json({ success: false, error: "Missing userId" });
+    }
 
-  try {
-    const response = await fetch(
-      `https://apis.roblox.com/universes/v1/users/${userId}/universes`,
-      {
-        headers: {
-          "x-api-key": apiKey,
-        },
-      }
-    );
+    try {
+        const response = await fetch(
+            `https://games.roblox.com/v2/users/${userId}/games?accessFilter=2&limit=50`
+        );
 
-    const data = await response.json();
+        const data = await response.json();
 
-    res.json({ success: true, games: data.data || [] });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false });
-  }
+        res.json({
+            success: true,
+            games: data.data || []
+        });
+
+    } catch (err) {
+        res.json({ success: false, error: err.message });
+    }
 });
 
-/* ================================
+/* ===============================
    PUBLISH BUILD
 ================================ */
 app.post("/publish", async (req, res) => {
-  const { apiKey, placeId, buildData } = req.body;
+    const { placeId, apiKey, buildData } = req.body;
 
-  if (!apiKey || !placeId) {
-    return res.status(400).json({
-      success: false,
-      error: "Missing apiKey or placeId",
-    });
-  }
+    if (!placeId || !apiKey) {
+        return res.json({ success: false, error: "Missing placeId or apiKey" });
+    }
 
-  try {
-    const response = await fetch(
-      `https://apis.roblox.com/datastores/v1/universes/${placeId}/standard-datastores/datastore/entries/entry`,
-      {
-        method: "POST",
-        headers: {
-          "x-api-key": apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          key: `build_${placeId}`,
-          value: buildData,
-        }),
-      }
-    );
+    try {
+        const response = await fetch(
+            `https://apis.roblox.com/universes/v1/places/${placeId}/versions?versionType=Published`,
+            {
+                method: "POST",
+                headers: {
+                    "x-api-key": apiKey,
+                    "Content-Type": "application/octet-stream"
+                },
+                body: Buffer.from(buildData || "StudioLiteBuild")
+            }
+        );
 
-    if (!response.ok) throw new Error("Roblox API error");
+        if (response.ok) {
+            res.json({ success: true });
+        } else {
+            const text = await response.text();
+            res.json({ success: false, error: text });
+        }
 
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false });
-  }
+    } catch (err) {
+        res.json({ success: false, error: err.message });
+    }
 });
 
-app.listen(3000, () => {
-  console.log("Server running on port 3000");
-});
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log("Server running on port " + PORT));
