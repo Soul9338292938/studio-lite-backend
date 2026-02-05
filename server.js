@@ -9,6 +9,32 @@ app.get("/", (_req, res) => {
   res.send("Studio-Lite backend running");
 });
 
+app.get("/games", async (req, res) => {
+  try {
+    const { key, userId } = req.query || {};
+
+    if (!key || !userId) {
+      return res.status(400).json({ success: false });
+    }
+
+    const r = await fetch(
+      `https://apis.roblox.com/universes/v1/users/${userId}/universes`,
+      {
+        headers: { "x-api-key": key }
+      }
+    );
+
+    if (!r.ok) {
+      return res.status(400).json({ success: false });
+    }
+
+    const data = await r.json();
+    return res.json({ success: true, games: data.data || [] });
+  } catch {
+    return res.status(500).json({ success: false });
+  }
+});
+
 app.post("/publish", async (req, res) => {
   try {
     const { key, placeId } = req.body || {};
@@ -17,21 +43,19 @@ app.post("/publish", async (req, res) => {
       return res.status(400).json({ success: false });
     }
 
-    const numericPlaceId = Number(placeId);
-
-    const robloxResponse = await fetch(
-      `https://apis.roblox.com/universes/v1/places/${numericPlaceId}/versions`,
+    const r = await fetch(
+      `https://apis.roblox.com/universes/v1/places/${Number(placeId)}/versions`,
       {
         method: "POST",
         headers: {
           "x-api-key": key,
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
-        body: "{}",
+        body: "{}"
       }
     );
 
-    if (!robloxResponse.ok) {
+    if (!r.ok) {
       return res.status(400).json({ success: false });
     }
 
