@@ -1,103 +1,64 @@
 const express = require("express");
+const fetch = (...args) => import("node-fetch").then(({default: fetch}) => fetch(...args));
 
 const app = express();
-app.use(express.json());
-
-app.get("/", (req, res) => {
-    res.send("Studio Lite backend running");
-});
+const PORT = process.env.PORT || 3000;
 
 /* ===============================
-   GET PLAYER GAMES
+   GET USER ID FROM API KEY
+================================ */
+async function getUserIdFromKey(apiKey) {
+    const res = await fetch("https://apis.roblox.com/oauth/v1/userinfo", {
+        headers: {
+            "x-api-key": apiKey
+        }
+    });
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    return data.sub; // userId
+}
+
+/* ===============================
+   GET USER GAMES
 ================================ */
 app.get("/games", async (req, res) => {
-    const { userId } = req.query;
-
-    if (!userId) {
-        return res.json({ success: false, error: "Missing userId" });
-    }
-
     try {
-        const response = await fetch(
-            `https://games.roblox.com/v2/users/${userId}/games?accessFilter=2&limit=50`
+        const apiKey = req.query.apiKey;
+        if (!apiKey) {
+            return res.json({ success: false, error: "Missing apiKey" });
+        }
+
+        const userId = await getUserIdFromKey(apiKey);
+        if (!userId) {
+            return res.json({ success: false, error: "Invalid API key" });
+        }
+
+        const gamesRes = await fetch(
+            `https://develop.roblox.com/v2/users/${userId}/experiences`,
+            { headers: { "x-api-key": apiKey } }
         );
 
-        const data = await response.json();
+        const gamesData = await gamesRes.json();
 
-        res.json({
+        return res.json({
             success: true,
-            games: data.data || []
+            games: gamesData.data || []
         });
 
     } catch (err) {
-        res.json({ success: false, error: err.message });
+        return res.json({ success: false, error: err.message });
     }
 });
 
 /* ===============================
-   PUBLISH BUILD
+   PUBLISH PLACE
 ================================ */
-app.post("/publish", async (req, res) => {
-    const { placeId, apiKey, buildData } = req.body;
-
-    if (!placeId || !apiKey) {
-        return res.json({ success: false, error: "Missing placeId or apiKey" });
-    }
-
-    try {
-        const response = await fetch(
-            `https://apis.roblox.com/universes/v1/places/${placeId}/versions?versionType=Published`,
-            {
-                method: "POST",
-                headers: {
-                    "x-api-key": apiKey,
-                    "Content-Type": "application/octet-stream"
-                },
-                body: Buffer.from(buildData || "StudioLiteBuild")
-            }
-        );
-
-        if (response.ok) {
-            res.json({ success: true });
-        } else {
-            const text = await response.text();
-            res.json({ success: false, error: text });
-        }
-
-    } catch (err) {
-        res.json({ success: false, error: err.message });
-    }
+app.get("/publish", async (req, res) => {
+    return res.json({ success: true, message: "Publish endpoint ready" });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Server running on port " + PORT));
-app.post("/publish", async (req, res) => {
-  try {
-    const { apiKey, placeId } = req.body;
-
-    if (!apiKey || !placeId) {
-      return res.json({ success: false, error: "Missing apiKey or placeId" });
-    }
-
-    const response = await fetch(
-      `https://apis.roblox.com/universes/v1/places/${placeId}/versions?versionType=Published`,
-      {
-        method: "POST",
-        headers: {
-          "x-api-key": apiKey,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      return res.json({ success: false, error: data });
-    }
-
-    res.json({ success: true, data });
-  } catch (err) {
-    res.json({ success: false, error: err.message });
-  }
+app.listen(PORT, () => {
+    console.log("Server running on port", PORT);
 });
