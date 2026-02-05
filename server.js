@@ -9,44 +9,36 @@ app.get("/", (req, res) => {
   res.send("Studio Lite backend running");
 });
 
-/* ================= GET USER GAMES ================= */
-app.get("/games", async (req, res) => {
-  try {
-    const { userId, apiKey } = req.query;
-
-    if (!userId || !apiKey) {
-      return res.json({ success: false, error: "Missing userId or apiKey" });
-    }
-
-    const response = await axios.get(
-      `https://develop.roblox.com/v1/universes?creatorTargetId=${userId}&creatorType=User`,
-      {
-        headers: { "x-api-key": apiKey }
-      }
-    );
-
-    return res.json({
-      success: true,
-      games: response.data.data || []
-    });
-
-  } catch (err) {
-    console.log("Roblox error:", err.response?.data || err.message);
-    return res.json({ success: false, error: "Failed to fetch games" });
+/* ================= STORED UNIVERSE LIST =================
+   ⚠️ Replace these IDs with YOUR real universe IDs
+*/
+const ALLOWED_GAMES = [
+  {
+    name: "Falling Star",
+    universeId: 1234567890, // ← replace with real universeId
+    placeId: 1111111111     // ← replace with real placeId
   }
+];
+
+/* ================= GET GAMES ================= */
+app.get("/games", async (req, res) => {
+  return res.json({
+    success: true,
+    games: ALLOWED_GAMES
+  });
 });
 
-/* ================= PUBLISH PLACE ================= */
+/* ================= PUBLISH ================= */
 app.post("/publish", async (req, res) => {
   try {
-    const { placeId, apiKey } = req.body;
+    const { universeId, apiKey } = req.body;
 
-    if (!placeId || !apiKey) {
-      return res.json({ success: false, error: "Missing placeId or apiKey" });
+    if (!universeId || !apiKey) {
+      return res.json({ success: false, error: "Missing universeId or apiKey" });
     }
 
     await axios.post(
-      `https://apis.roblox.com/universes/v1/places/${placeId}/versions`,
+      `https://apis.roblox.com/universes/v1/${universeId}/places/versions?versionType=Published`,
       {},
       {
         headers: {
@@ -60,7 +52,7 @@ app.post("/publish", async (req, res) => {
 
   } catch (err) {
     console.log("Publish error:", err.response?.data || err.message);
-    return res.json({ success: false, error: "Roblox publish API failed" });
+    return res.json({ success: false, error: "Roblox publish failed" });
   }
 });
 
