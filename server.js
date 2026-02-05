@@ -1,64 +1,95 @@
 const express = require("express");
-const fetch = (...args) => import("node-fetch").then(({default: fetch}) => fetch(...args));
 
 const app = express();
+app.use(express.json());
+
 const PORT = process.env.PORT || 3000;
 
 /* ===============================
-   GET USER ID FROM API KEY
+   HEALTH CHECK
 ================================ */
-async function getUserIdFromKey(apiKey) {
-    const res = await fetch("https://apis.roblox.com/oauth/v1/userinfo", {
-        headers: {
-            "x-api-key": apiKey
-        }
-    });
+app.get("/", (req, res) => {
+  res.send("Studio Lite backend running");
+});
 
-    if (!res.ok) return null;
-
-    const data = await res.json();
-    return data.sub; // userId
-}
 
 /* ===============================
-   GET USER GAMES
+   GET USER UNIVERSes
+   URL: /games?key=API_KEY&userId=USER_ID
 ================================ */
 app.get("/games", async (req, res) => {
-    try {
-        const apiKey = req.query.apiKey;
-        if (!apiKey) {
-            return res.json({ success: false, error: "Missing apiKey" });
-        }
+  try {
+    const { key, userId } = req.query;
 
-        const userId = await getUserIdFromKey(apiKey);
-        if (!userId) {
-            return res.json({ success: false, error: "Invalid API key" });
-        }
-
-        const gamesRes = await fetch(
-            `https://develop.roblox.com/v2/users/${userId}/experiences`,
-            { headers: { "x-api-key": apiKey } }
-        );
-
-        const gamesData = await gamesRes.json();
-
-        return res.json({
-            success: true,
-            games: gamesData.data || []
-        });
-
-    } catch (err) {
-        return res.json({ success: false, error: err.message });
+    if (!key || !userId) {
+      return res.json({ success: false, error: "Missing key or userId" });
     }
+
+    const response = await fetch(
+      `https://apis.roblox.com/universes/v1/users/${userId}/universes`,
+      {
+        method: "GET",
+        headers: {
+          "x-api-key": key,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      return res.json({ success: false, error: "Invalid API key" });
+    }
+
+    const data = await response.json();
+
+    return res.json({
+      success: true,
+      data: data.data || [],
+    });
+
+  } catch (err) {
+    return res.json({ success: false, error: err.message });
+  }
 });
+
 
 /* ===============================
    PUBLISH PLACE
+   URL: POST /publish
+   BODY: { key, placeId }
 ================================ */
-app.get("/publish", async (req, res) => {
-    return res.json({ success: true, message: "Publish endpoint ready" });
+app.post("/publish", async (req, res) => {
+  try {
+    const { key, placeId } = req.body;
+
+    if (!key || !placeId) {
+      return res.json({ success: false, error: "Missing key or placeId" });
+    }
+
+    const response = await fetch(
+      `https://apis.roblox.com/universes/v1/places/${placeId}/versions?versionType=Published`,
+      {
+        method: "POST",
+        headers: {
+          "x-api-key": key,
+          "Content-Type": "application/json",
+        },
+        body: "{}",
+      }
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      return res.json({ success: false, error: text });
+    }
+
+    return res.json({ success: true });
+
+  } catch (err) {
+    return res.json({ success: false, error: err.message });
+  }
 });
 
+
 app.listen(PORT, () => {
-    console.log("Server running on port", PORT);
+  console.log("Server running on port " + PORT);
 });
