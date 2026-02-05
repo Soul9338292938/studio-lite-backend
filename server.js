@@ -71,3 +71,33 @@ app.post("/publish", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("Server running on port " + PORT));
+app.post("/publish", async (req, res) => {
+  try {
+    const { apiKey, placeId } = req.body;
+
+    if (!apiKey || !placeId) {
+      return res.json({ success: false, error: "Missing apiKey or placeId" });
+    }
+
+    const response = await fetch(
+      `https://apis.roblox.com/universes/v1/places/${placeId}/versions?versionType=Published`,
+      {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return res.json({ success: false, error: data });
+    }
+
+    res.json({ success: true, data });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
