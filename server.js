@@ -9,65 +9,49 @@ app.get("/", (req, res) => {
     res.send("Studio Lite backend running")
 })
 
-/*
-==============================
-GET USER GAMES
-==============================
-Body:
-{
-  userId,
-  apiKey
-}
-*/
-app.post("/games", async (req, res) => {
-    const { userId, apiKey } = req.body
 
-    if (!userId || !apiKey) {
-        return res.json({ success: false, error: "Missing userId or apiKey" })
-    }
-
+// GET GAMES
+app.get("/games", async (req, res) => {
     try {
+        const userId = req.query.userId
+        const apiKey = req.query.apiKey
+
+        if (!userId || !apiKey) {
+            return res.json({ success: false, error: "Missing userId or apiKey" })
+        }
+
         const response = await axios.get(
-            `https://develop.roblox.com/v1/universes?creatorTargetId=${userId}&creatorType=User`,
+            `https://apis.roblox.com/cloud/v2/users/${userId}/places`,
             {
-                headers: { "x-api-key": apiKey }
+                headers: {
+                    "x-api-key": apiKey
+                }
             }
         )
 
-        return res.json({
+        res.json({
             success: true,
-            games: response.data.data.map(g => ({
-                name: g.name,
-                placeId: g.rootPlace.id,
-                universeId: g.id
-            }))
+            games: response.data.data || []
         })
 
     } catch (err) {
-        return res.json({ success: false, error: "Failed to load games" })
+        console.log("Games error:", err.response?.data || err.message)
+        res.json({ success: false, error: "Failed to fetch games" })
     }
 })
 
-/*
-==============================
-PUBLISH GAME
-==============================
-Body:
-{
-  universeId,
-  apiKey
-}
-*/
+
+// PUBLISH PLACE
 app.post("/publish", async (req, res) => {
-    const { universeId, apiKey } = req.body
-
-    if (!universeId || !apiKey) {
-        return res.json({ success: false, error: "Missing data" })
-    }
-
     try {
+        const { placeId, apiKey } = req.body
+
+        if (!placeId || !apiKey) {
+            return res.json({ success: false, error: "Missing placeId or apiKey" })
+        }
+
         await axios.post(
-            `https://develop.roblox.com/v1/universes/${universeId}/publish`,
+            `https://apis.roblox.com/universes/v1/places/${placeId}/versions`,
             {},
             {
                 headers: {
@@ -77,15 +61,15 @@ app.post("/publish", async (req, res) => {
             }
         )
 
-        return res.json({ success: true })
+        res.json({ success: true })
 
     } catch (err) {
-        return res.json({
-            success: false,
-            error: "Roblox publish API failed"
-        })
+        console.log("Publish error:", err.response?.data || err.message)
+        res.json({ success: false, error: "Roblox publish API failed" })
     }
 })
 
+
+// PORT
 const PORT = process.env.PORT || 3000
-app.listen(PORT, () => console.log("Server running on port " + PORT))
+app.listen(PORT, () => console.log("Server running on port", PORT))
